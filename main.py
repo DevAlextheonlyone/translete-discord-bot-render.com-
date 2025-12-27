@@ -1,48 +1,49 @@
 import discord
+from discord.ext import commands
 from googletrans import Translator
+from flask import Flask
+import threading
 import os
 
-TOKEN = os.getenv("DISCORD_TOKEN")
+# ---------- WEB SERVER ----------
+app = Flask(__name__)
 
+@app.route("/")
+def home():
+    return "Discord bot is running ✅"
+
+def run_web():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
+
+threading.Thread(target=run_web).start()
+
+# ---------- DISCORD BOT ----------
 intents = discord.Intents.default()
 intents.message_content = True
 
-client = discord.Client(intents=intents)
+bot = commands.Bot(command_prefix="!", intents=intents)
 translator = Translator()
 
-@client.event
+@bot.event
 async def on_ready():
-    print(f"Inloggad som {client.user}")
+    print(f"✅ Logged in as {bot.user}")
 
-@client.event
+@bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    content = message.content.strip()
-
-    # kör bara om meddelandet börjar med "translate "
-    if not content.lower().startswith("translate "):
+    if not message.content.lower().startswith("translate "):
         return
 
-    text_to_translate = content[len("translate "):].strip()
-    if not text_to_translate:
-        return
+    text = message.content[len("translate "):]
 
     try:
-        translated = translator.translate(
-            text_to_translate,
-            src="sv",
-            dest="en"
-        )
-
+        translated = translator.translate(text, src="sv", dest="en").text
         await message.delete()
-
-        await message.channel.send(
-            f"**{message.author.display_name}:** {translated.text}"
-        )
-
+        await message.channel.send(f"**{message.author.display_name}:** {translated}")
     except Exception as e:
-        print("Fel:", e)
+        await message.channel.send("❌ Translation failed")
 
-client.run(TOKEN)
+bot.run(os.getenv("DISCORD_TOKEN"))
