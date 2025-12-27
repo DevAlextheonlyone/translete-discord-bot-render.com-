@@ -1,93 +1,77 @@
 import os
-import threading
 import discord
 from discord.ext import commands
 from googletrans import Translator
 from flask import Flask
+import threading
 
-# =====================
-# 🌐 WEB SERVER
-# =====================
+# -------- WEB SERVER (for Render + UptimeRobot) --------
 app = Flask(__name__)
 
 @app.route("/")
 def home():
-    return "✅ Discord Translate Bot is running!"
+    return "Bot is running ✅"
 
 def run_web():
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
 
 threading.Thread(target=run_web).start()
 
-# =====================
-# 🤖 DISCORD BOT
-# =====================
-TOKEN = os.getenv("DISCORD_TOKEN")
-
+# -------- DISCORD BOT --------
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)
+bot = commands.Bot(command_prefix=None, intents=intents)
 translator = Translator()
 
 @bot.event
 async def on_ready():
-    print(f"✅ Inloggad som {bot.user}")
+    await bot.tree.sync()
+    print(f"Logged in as {bot.user}")
 
+# -------- /help COMMAND (ENGLISH) --------
+@bot.tree.command(name="help", description="How to use the translate bot")
+async def help_command(interaction: discord.Interaction):
+    await interaction.response.send_message(
+        "**📘 Translate Bot – Help**\n\n"
+        "**Usage:**\n"
+        "`translate <language> <text>`\n\n"
+        "**Example:**\n"
+        "`translate sv hi what are you doing`\n\n"
+        "**Result:**\n"
+        "`@you hej vad gör du`\n\n"
+        "**Language codes:**\n"
+        "`sv` Swedish\n"
+        "`en` English\n"
+        "`de` German\n"
+        "`fr` French\n"
+        "`es` Spanish\n\n"
+        "🗑 Your original message will be deleted automatically."
+    )
+
+# -------- MESSAGE LISTENER --------
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
 
-    content = message.content.strip()
-
-    # Kräver "translate"
-    if not content.lower().startswith("translate "):
+    if not message.content.lower().startswith("translate "):
         return
 
-    parts = content.split(" ", 2)
-
-    # translate sv text
+    parts = message.content.split(" ", 2)
     if len(parts) < 3:
-        await message.delete()
-        await message.channel.send(
-            "❌ **Fel format**\n"
-            "**Exempel:** `translate sv hi how are you`"
-        )
         return
 
-    _, target_lang, text = parts
+    target_lang = parts[1]
+    text = parts[2]
 
     try:
-        result = translator.translate(text, dest=target_lang)
+        translated = translator.translate(text, dest=target_lang).text
+
         await message.delete()
-        await message.channel.send(result.text)
+        await message.channel.send(f"{message.author.mention} {translated}")
 
-    except Exception:
-        await message.delete()
-        await message.channel.send("❌ Kunde inte översätta.")
+    except Exception as e:
+        await message.channel.send("❌ Translation failed.")
 
-@bot.tree.command(name="help", description="Hur du använder translate-botten")
-async def help_command(interaction: discord.Interaction):
-    await interaction.response.send_message(
-        "**📘 Translate Bot – Hjälp**\n\n"
-        "**Format:**\n"
-        "`translate <språk> <text>`\n\n"
-        "**Exempel:**\n"
-        "`translate sv hi what are you doing`\n\n"
-        "**Resultat:**\n"
-        "`hej vad gör du`\n\n"
-        "**Språkförkortningar:**\n"
-        "`sv` svenska\n"
-        "`en` engelska\n"
-        "`de` tyska\n"
-        "`fr` franska\n"
-        "`es` spanska\n\n"
-        "🗑 Ditt meddelande tas bort automatiskt."
-    )
-
-async def setup_hook():
-    await bot.tree.sync()
-
-bot.setup_hook = setup_hook
-bot.run(TOKEN)
+bot.run(os.environ["DISCORD_TOKEN"])
