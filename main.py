@@ -1,8 +1,27 @@
 import os
+import threading
 import discord
 from discord.ext import commands
 from googletrans import Translator
+from flask import Flask
 
+# =====================
+# 🌐 WEB SERVER
+# =====================
+app = Flask(__name__)
+
+@app.route("/")
+def home():
+    return "✅ Discord Translate Bot is running!"
+
+def run_web():
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+
+threading.Thread(target=run_web).start()
+
+# =====================
+# 🤖 DISCORD BOT
+# =====================
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
@@ -11,11 +30,9 @@ intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 translator = Translator()
 
-
 @bot.event
 async def on_ready():
     print(f"✅ Inloggad som {bot.user}")
-
 
 @bot.event
 async def on_message(message):
@@ -24,7 +41,7 @@ async def on_message(message):
 
     content = message.content.strip()
 
-    # Kräver att man skriver "translate"
+    # Kräver "translate"
     if not content.lower().startswith("translate "):
         return
 
@@ -35,7 +52,7 @@ async def on_message(message):
         await message.delete()
         await message.channel.send(
             "❌ **Fel format**\n"
-            "**Exempel:** `translate sv hello how are you`"
+            "**Exempel:** `translate sv hi how are you`"
         )
         return
 
@@ -48,14 +65,13 @@ async def on_message(message):
 
     except Exception:
         await message.delete()
-        await message.channel.send("❌ Kunde inte översätta texten.")
-
+        await message.channel.send("❌ Kunde inte översätta.")
 
 @bot.tree.command(name="help", description="Hur du använder translate-botten")
 async def help_command(interaction: discord.Interaction):
     await interaction.response.send_message(
         "**📘 Translate Bot – Hjälp**\n\n"
-        "**Användning:**\n"
+        "**Format:**\n"
         "`translate <språk> <text>`\n\n"
         "**Exempel:**\n"
         "`translate sv hi what are you doing`\n\n"
@@ -67,13 +83,11 @@ async def help_command(interaction: discord.Interaction):
         "`de` tyska\n"
         "`fr` franska\n"
         "`es` spanska\n\n"
-        "🔹 Ditt meddelande tas bort automatiskt."
+        "🗑 Ditt meddelande tas bort automatiskt."
     )
-
 
 async def setup_hook():
     await bot.tree.sync()
-
 
 bot.setup_hook = setup_hook
 bot.run(TOKEN)
