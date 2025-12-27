@@ -1,7 +1,10 @@
 services:
   - type: web
-    name: discord-translator-bot
+    name: discord-translate-bot
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: python main.py
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
